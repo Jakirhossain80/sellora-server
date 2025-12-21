@@ -2,6 +2,16 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../../models/User");
 
+const JWT_SECRET = process.env.JWT_SECRET || "CLIENT_SECRET_KEY";
+const isProduction = process.env.NODE_ENV === "production";
+
+const cookieOptions = {
+  httpOnly: true,
+  secure: isProduction, // true only in production (HTTPS)
+  sameSite: isProduction ? "none" : "lax",
+  maxAge: 60 * 60 * 1000, // 60m (matches token expiry)
+};
+
 //register
 const registerUser = async (req, res) => {
   const { userName, email, password } = req.body;
@@ -64,11 +74,11 @@ const loginUser = async (req, res) => {
         email: checkUser.email,
         userName: checkUser.userName,
       },
-      "CLIENT_SECRET_KEY",
+      JWT_SECRET,
       { expiresIn: "60m" }
     );
 
-    res.cookie("token", token, { httpOnly: true, secure: false }).json({
+    res.cookie("token", token, cookieOptions).json({
       success: true,
       message: "Logged in successfully",
       user: {
@@ -88,9 +98,14 @@ const loginUser = async (req, res) => {
 };
 
 //logout
-
 const logoutUser = (req, res) => {
-  res.clearCookie("token").json({
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+  });
+
+  res.json({
     success: true,
     message: "Logged out successfully!",
   });
@@ -98,7 +113,8 @@ const logoutUser = (req, res) => {
 
 //auth middleware
 const authMiddleware = async (req, res, next) => {
-  const token = req.cookies.token;
+  const token = req.cookies?.token;
+
   if (!token)
     return res.status(401).json({
       success: false,
@@ -106,7 +122,7 @@ const authMiddleware = async (req, res, next) => {
     });
 
   try {
-    const decoded = jwt.verify(token, "CLIENT_SECRET_KEY");
+    const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
   } catch (error) {
