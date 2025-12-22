@@ -2,14 +2,19 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../../models/User");
 
-const JWT_SECRET = process.env.JWT_SECRET || "CLIENT_SECRET_KEY";
 const isProduction = process.env.NODE_ENV === "production";
+const JWT_SECRET = process.env.JWT_SECRET || "CLIENT_SECRET_KEY";
+
+if (isProduction && !process.env.JWT_SECRET) {
+  console.warn("⚠️ WARNING: JWT_SECRET is missing in production .env (using fallback). Please set JWT_SECRET.");
+}
 
 const cookieOptions = {
   httpOnly: true,
   secure: isProduction, // true only in production (HTTPS)
   sameSite: isProduction ? "none" : "lax",
-  maxAge: 60 * 60 * 1000, // 60m (matches token expiry)
+  maxAge: 60 * 60 * 1000, // 60m
+  path: "/", // ✅ keeps set/clear consistent
 };
 
 //register
@@ -57,10 +62,7 @@ const loginUser = async (req, res) => {
         message: "User doesn't exists! Please register first",
       });
 
-    const checkPasswordMatch = await bcrypt.compare(
-      password,
-      checkUser.password
-    );
+    const checkPasswordMatch = await bcrypt.compare(password, checkUser.password);
     if (!checkPasswordMatch)
       return res.json({
         success: false,
@@ -103,6 +105,7 @@ const logoutUser = (req, res) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
   });
 
   res.json({
