@@ -7,7 +7,13 @@ const {
 
 const router = express.Router();
 
-router.post("/add", addProductReview);
-router.get("/:productId", getProductReviews);
+// ✅ Minimal + safe: wrap async handlers to avoid unhandled promise rejections
+const asyncHandler =
+  (fn) =>
+  (req, res, next) =>
+    Promise.resolve(fn(req, res, next)).catch(next);
+
+router.post("/add", asyncHandler(addProductReview));
+router.get("/:productId", asyncHandler(getProductReviews));
 
 module.exports = router;

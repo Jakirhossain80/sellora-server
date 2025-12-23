@@ -7,12 +7,15 @@ const UserSchema = new mongoose.Schema(
       required: true,
       unique: true,
       trim: true,
+      index: true, // ✅ minimal + safe: speeds up lookups by userName
     },
     email: {
       type: String,
       required: true,
       unique: true,
       trim: true,
+      lowercase: true, // ✅ minimal + safe: keeps emails consistent
+      index: true, // ✅ minimal + safe: speeds up lookups by email
     },
     password: {
       type: String,
@@ -21,6 +24,7 @@ const UserSchema = new mongoose.Schema(
     role: {
       type: String,
       default: "user",
+      trim: true,
     },
   },
   { timestamps: true }

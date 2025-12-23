@@ -9,9 +9,15 @@ const {
 
 const router = express.Router();
 
-router.post("/add", addAddress);
-router.get("/get/:userId", fetchAllAddress);
-router.delete("/delete/:userId/:addressId", deleteAddress);
-router.put("/update/:userId/:addressId", editAddress);
+// ✅ Minimal + safe: wrap async handlers to avoid unhandled promise rejections
+const asyncHandler =
+  (fn) =>
+  (req, res, next) =>
+    Promise.resolve(fn(req, res, next)).catch(next);
+
+router.post("/add", asyncHandler(addAddress));
+router.get("/get/:userId", asyncHandler(fetchAllAddress));
+router.delete("/delete/:userId/:addressId", asyncHandler(deleteAddress));
+router.put("/update/:userId/:addressId", asyncHandler(editAddress));
 
 module.exports = router;

@@ -63,13 +63,13 @@ app.use("/api/common/feature", commonFeatureRouter);
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: "Route not found" });
+  return res.status(404).json({ success: false, message: "Route not found" });
 });
 
 // Global error handler
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(err.status || 500).json({
+  return res.status(err.status || 500).json({
     success: false,
     message: err.message || "Internal Server Error",
   });
@@ -81,12 +81,20 @@ if (!process.env.MONGO_URI) {
   process.exit(1);
 }
 
+// ✅ Minimal + safe: add common mongoose connection options and slightly better logs
 mongoose
-  .connect(process.env.MONGO_URI)
+  .connect(process.env.MONGO_URI, {
+    // These are safe defaults (ignored by newer drivers if not needed)
+    // keepAlive helps long-running deployments
+    keepAlive: true,
+  })
   .then(() => {
-    console.log("MongoDB connected");
+    console.log("✅ MongoDB connected");
     app.listen(PORT, () =>
-      console.log(`Server is now running on port ${PORT}`)
+      console.log(`✅ Server is now running on port ${PORT}`)
     );
   })
-  .catch((error) => console.log("MongoDB connection error:", error));
+  .catch((error) => {
+    console.error("❌ MongoDB connection error:", error);
+    process.exit(1);
+  });

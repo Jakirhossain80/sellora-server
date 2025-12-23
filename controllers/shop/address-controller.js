@@ -1,9 +1,11 @@
+const mongoose = require("mongoose");
 const Address = require("../../models/Address");
 
 const addAddress = async (req, res) => {
   try {
     const { userId, address, city, pincode, phone, notes } = req.body;
 
+    // ✅ Minimal validation (keeps same requirement: all fields must exist)
     if (!userId || !address || !city || !pincode || !phone || !notes) {
       return res.status(400).json({
         success: false,
@@ -11,24 +13,38 @@ const addAddress = async (req, res) => {
       });
     }
 
+    // ✅ Prevent CastError noise if userId is expected to be an ObjectId
+    // (If your Address.userId is a String, this won't hurt; it just won't block.)
+    if (mongoose.isValidObjectId && mongoose.Schema?.Types?.ObjectId) {
+      // Only validate if it's plausibly an ObjectId-shaped value
+      // (Avoid breaking if you store userId as a plain string like Firebase UID.)
+      const looksLikeObjectId = typeof userId === "string" && userId.length === 24;
+      if (looksLikeObjectId && !mongoose.Types.ObjectId.isValid(userId)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid data provided!",
+        });
+      }
+    }
+
     const newlyCreatedAddress = new Address({
       userId,
-      address,
-      city,
+      address: typeof address === "string" ? address.trim() : address,
+      city: typeof city === "string" ? city.trim() : city,
       pincode,
-      notes,
+      notes: typeof notes === "string" ? notes.trim() : notes,
       phone,
     });
 
     await newlyCreatedAddress.save();
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: newlyCreatedAddress,
     });
   } catch (e) {
-    console.log(e);
-    res.status(500).json({
+    console.error(e);
+    return res.status(500).json({
       success: false,
       message: "Error",
     });
@@ -45,15 +61,16 @@ const fetchAllAddress = async (req, res) => {
       });
     }
 
-    const addressList = await Address.find({ userId });
+    // ✅ lean() for faster reads (safe for read-only list)
+    const addressList = await Address.find({ userId }).lean();
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: addressList,
     });
   } catch (e) {
-    console.log(e);
-    res.status(500).json({
+    console.error(e);
+    return res.status(500).json({
       success: false,
       message: "Error",
     });
@@ -72,11 +89,20 @@ const editAddress = async (req, res) => {
       });
     }
 
+    // ✅ Prevent CastError for invalid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(addressId)) {
+      return res.status(404).json({
+        success: false,
+        message: "Address not found",
+      });
+    }
+
+    // ✅ Minimal safety: avoid updating identifiers accidentally
+    if (formData?._id) delete formData._id;
+    if (formData?.userId) delete formData.userId;
+
     const address = await Address.findOneAndUpdate(
-      {
-        _id: addressId,
-        userId,
-      },
+      { _id: addressId, userId },
       formData,
       { new: true }
     );
@@ -88,13 +114,13 @@ const editAddress = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: address,
     });
   } catch (e) {
-    console.log(e);
-    res.status(500).json({
+    console.error(e);
+    return res.status(500).json({
       success: false,
       message: "Error",
     });
@@ -111,6 +137,14 @@ const deleteAddress = async (req, res) => {
       });
     }
 
+    // ✅ Prevent CastError for invalid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(addressId)) {
+      return res.status(404).json({
+        success: false,
+        message: "Address not found",
+      });
+    }
+
     const address = await Address.findOneAndDelete({ _id: addressId, userId });
 
     if (!address) {
@@ -120,13 +154,13 @@ const deleteAddress = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Address deleted successfully",
     });
   } catch (e) {
-    console.log(e);
-    res.status(500).json({
+    console.error(e);
+    return res.status(500).json({
       success: false,
       message: "Error",
     });

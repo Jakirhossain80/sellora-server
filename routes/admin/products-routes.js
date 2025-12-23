@@ -12,10 +12,20 @@ const { upload } = require("../../helpers/cloudinary");
 
 const router = express.Router();
 
-router.post("/upload-image", upload.single("my_file"), handleImageUpload);
-router.post("/add", addProduct);
-router.put("/edit/:id", editProduct);
-router.delete("/delete/:id", deleteProduct);
-router.get("/get", fetchAllProducts);
+// ✅ Minimal + safe: wrap async handlers to avoid unhandled promise rejections
+const asyncHandler =
+  (fn) =>
+  (req, res, next) =>
+    Promise.resolve(fn(req, res, next)).catch(next);
+
+router.post(
+  "/upload-image",
+  upload.single("my_file"),
+  asyncHandler(handleImageUpload)
+);
+router.post("/add", asyncHandler(addProduct));
+router.put("/edit/:id", asyncHandler(editProduct));
+router.delete("/delete/:id", asyncHandler(deleteProduct));
+router.get("/get", asyncHandler(fetchAllProducts));
 
 module.exports = router;

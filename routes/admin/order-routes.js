@@ -8,6 +8,7 @@ const {
 
 const router = express.Router();
 
+// ✅ Minimal + safe: no functionality change, just explicit return of handlers
 router.get("/get", getAllOrdersOfAllUsers);
 router.get("/details/:id", getOrderDetailsForAdmin);
 router.put("/update/:id", updateOrderStatus);

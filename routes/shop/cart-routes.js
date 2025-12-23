@@ -9,9 +9,15 @@ const {
 
 const router = express.Router();
 
-router.post("/add", addToCart);
-router.get("/get/:userId", fetchCartItems);
-router.put("/update-cart", updateCartItemQty);
-router.delete("/:userId/:productId", deleteCartItem);
+// ✅ Minimal + safe: wrap async handlers to avoid unhandled promise rejections
+const asyncHandler =
+  (fn) =>
+  (req, res, next) =>
+    Promise.resolve(fn(req, res, next)).catch(next);
+
+router.post("/add", asyncHandler(addToCart));
+router.get("/get/:userId", asyncHandler(fetchCartItems));
+router.put("/update-cart", asyncHandler(updateCartItemQty));
+router.delete("/:userId/:productId", asyncHandler(deleteCartItem));
 
 module.exports = router;

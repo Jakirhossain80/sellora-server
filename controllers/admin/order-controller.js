@@ -1,8 +1,10 @@
+const mongoose = require("mongoose");
 const Order = require("../../models/Order");
 
 const getAllOrdersOfAllUsers = async (req, res) => {
   try {
-    const orders = await Order.find({});
+    // ✅ Use lean() for faster read + lower memory (safe for read-only responses)
+    const orders = await Order.find({}).lean();
 
     if (!orders.length) {
       return res.status(404).json({
@@ -11,13 +13,13 @@ const getAllOrdersOfAllUsers = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: orders,
     });
   } catch (e) {
-    console.log(e);
-    res.status(500).json({
+    console.error(e);
+    return res.status(500).json({
       success: false,
       message: "Some error occured!",
     });
@@ -28,7 +30,16 @@ const getOrderDetailsForAdmin = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const order = await Order.findById(id);
+    // ✅ Prevent CastError noise for invalid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found!",
+      });
+    }
+
+    // ✅ lean() for read-only response
+    const order = await Order.findById(id).lean();
 
     if (!order) {
       return res.status(404).json({
@@ -37,13 +48,13 @@ const getOrderDetailsForAdmin = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: order,
     });
   } catch (e) {
-    console.log(e);
-    res.status(500).json({
+    console.error(e);
+    return res.status(500).json({
       success: false,
       message: "Some error occured!",
     });
@@ -55,24 +66,43 @@ const updateOrderStatus = async (req, res) => {
     const { id } = req.params;
     const { orderStatus } = req.body;
 
-    const order = await Order.findById(id);
+    // ✅ Basic validation (minimal + safe)
+    if (!orderStatus) {
+      return res.status(400).json({
+        success: false,
+        message: "orderStatus is required!",
+      });
+    }
 
-    if (!order) {
+    // ✅ Prevent CastError noise for invalid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(404).json({
         success: false,
         message: "Order not found!",
       });
     }
 
-    await Order.findByIdAndUpdate(id, { orderStatus });
+    // ✅ Single DB call (instead of find + update)
+    const updatedOrder = await Order.findByIdAndUpdate(
+      id,
+      { orderStatus },
+      { new: true }
+    );
 
-    res.status(200).json({
+    if (!updatedOrder) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found!",
+      });
+    }
+
+    return res.status(200).json({
       success: true,
       message: "Order status is updated successfully!",
     });
   } catch (e) {
-    console.log(e);
-    res.status(500).json({
+    console.error(e);
+    return res.status(500).json({
       success: false,
       message: "Some error occured!",
     });

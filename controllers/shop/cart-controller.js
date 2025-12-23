@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Cart = require("../../models/Cart");
 const Product = require("../../models/Product");
 
@@ -5,15 +6,24 @@ const addToCart = async (req, res) => {
   try {
     const { userId, productId, quantity } = req.body;
 
-    if (!userId || !productId || quantity <= 0) {
+    // ✅ minimal validation (also ensures quantity is a number)
+    const qty = Number(quantity);
+    if (!userId || !productId || !Number.isFinite(qty) || qty <= 0) {
       return res.status(400).json({
         success: false,
         message: "Invalid data provided!",
       });
     }
 
-    const product = await Product.findById(productId);
+    // ✅ prevent CastError for invalid productId
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
 
+    const product = await Product.findById(productId).select("_id");
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -32,19 +42,19 @@ const addToCart = async (req, res) => {
     );
 
     if (findCurrentProductIndex === -1) {
-      cart.items.push({ productId, quantity });
+      cart.items.push({ productId, quantity: qty });
     } else {
-      cart.items[findCurrentProductIndex].quantity += quantity;
+      cart.items[findCurrentProductIndex].quantity += qty;
     }
 
     await cart.save();
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: cart,
     });
   } catch (error) {
-    console.log(error);
-    res.status(500).json({
+    console.error(error);
+    return res.status(500).json({
       success: false,
       message: "Error",
     });
@@ -74,9 +84,7 @@ const fetchCartItems = async (req, res) => {
       });
     }
 
-    const validItems = cart.items.filter(
-      (productItem) => productItem.productId
-    );
+    const validItems = cart.items.filter((productItem) => productItem.productId);
 
     if (validItems.length < cart.items.length) {
       cart.items = validItems;
@@ -92,7 +100,7 @@ const fetchCartItems = async (req, res) => {
       quantity: item.quantity,
     }));
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: {
         ...cart._doc,
@@ -100,8 +108,8 @@ const fetchCartItems = async (req, res) => {
       },
     });
   } catch (error) {
-    console.log(error);
-    res.status(500).json({
+    console.error(error);
+    return res.status(500).json({
       success: false,
       message: "Error",
     });
@@ -112,10 +120,19 @@ const updateCartItemQty = async (req, res) => {
   try {
     const { userId, productId, quantity } = req.body;
 
-    if (!userId || !productId || quantity <= 0) {
+    const qty = Number(quantity);
+    if (!userId || !productId || !Number.isFinite(qty) || qty <= 0) {
       return res.status(400).json({
         success: false,
         message: "Invalid data provided!",
+      });
+    }
+
+    // ✅ prevent CastError for invalid productId
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(404).json({
+        success: false,
+        message: "Cart item not present !",
       });
     }
 
@@ -138,7 +155,7 @@ const updateCartItemQty = async (req, res) => {
       });
     }
 
-    cart.items[findCurrentProductIndex].quantity = quantity;
+    cart.items[findCurrentProductIndex].quantity = qty;
     await cart.save();
 
     await cart.populate({
@@ -155,7 +172,7 @@ const updateCartItemQty = async (req, res) => {
       quantity: item.quantity,
     }));
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: {
         ...cart._doc,
@@ -163,8 +180,8 @@ const updateCartItemQty = async (req, res) => {
       },
     });
   } catch (error) {
-    console.log(error);
-    res.status(500).json({
+    console.error(error);
+    return res.status(500).json({
       success: false,
       message: "Error",
     });
@@ -181,6 +198,16 @@ const deleteCartItem = async (req, res) => {
       });
     }
 
+    // ✅ prevent CastError for invalid productId
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          items: [],
+        },
+      });
+    }
+
     const cart = await Cart.findOne({ userId }).populate({
       path: "items.productId",
       select: "image title price salePrice",
@@ -193,8 +220,9 @@ const deleteCartItem = async (req, res) => {
       });
     }
 
+    // ✅ safe filter even if some populated productId is null
     cart.items = cart.items.filter(
-      (item) => item.productId._id.toString() !== productId
+      (item) => item.productId && item.productId._id.toString() !== productId
     );
 
     await cart.save();
@@ -213,7 +241,7 @@ const deleteCartItem = async (req, res) => {
       quantity: item.quantity,
     }));
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: {
         ...cart._doc,
@@ -221,8 +249,8 @@ const deleteCartItem = async (req, res) => {
       },
     });
   } catch (error) {
-    console.log(error);
-    res.status(500).json({
+    console.error(error);
+    return res.status(500).json({
       success: false,
       message: "Error",
     });

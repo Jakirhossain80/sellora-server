@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const paypal = require("../../helpers/paypal");
 const Order = require("../../models/Order");
 const Cart = require("../../models/Cart");
@@ -20,6 +21,22 @@ const createOrder = async (req, res) => {
       cartId,
     } = req.body;
 
+    // ✅ Minimal safety guards (no behavior change when valid)
+    if (!userId || !Array.isArray(cartItems) || cartItems.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Some error occured!",
+      });
+    }
+
+    const amountNum = Number(totalAmount);
+    if (!Number.isFinite(amountNum) || amountNum <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Some error occured!",
+      });
+    }
+
     const create_payment_json = {
       intent: "sale",
       payer: {
@@ -35,14 +52,14 @@ const createOrder = async (req, res) => {
             items: cartItems.map((item) => ({
               name: item.title,
               sku: item.productId,
-              price: item.price.toFixed(2),
+              price: Number(item.price).toFixed(2),
               currency: "USD",
               quantity: item.quantity,
             })),
           },
           amount: {
             currency: "USD",
-            total: totalAmount.toFixed(2),
+            total: amountNum.toFixed(2),
           },
           description: "description",
         },
@@ -51,13 +68,14 @@ const createOrder = async (req, res) => {
 
     paypal.payment.create(create_payment_json, async (error, paymentInfo) => {
       if (error) {
-        console.log(error);
-
+        console.error(error);
         return res.status(500).json({
           success: false,
           message: "Error while creating paypal payment",
         });
-      } else {
+      }
+
+      try {
         const newlyCreatedOrder = new Order({
           userId,
           cartId,
@@ -75,20 +93,33 @@ const createOrder = async (req, res) => {
 
         await newlyCreatedOrder.save();
 
-        const approvalURL = paymentInfo.links.find(
+        const approvalLink = paymentInfo?.links?.find(
           (link) => link.rel === "approval_url"
-        ).href;
+        );
 
-        res.status(201).json({
+        if (!approvalLink?.href) {
+          return res.status(500).json({
+            success: false,
+            message: "Error while creating paypal payment",
+          });
+        }
+
+        return res.status(201).json({
           success: true,
-          approvalURL,
+          approvalURL: approvalLink.href,
           orderId: newlyCreatedOrder._id,
+        });
+      } catch (err) {
+        console.error(err);
+        return res.status(500).json({
+          success: false,
+          message: "Some error occured!",
         });
       }
     });
   } catch (e) {
-    console.log(e);
-    res.status(500).json({
+    console.error(e);
+    return res.status(500).json({
       success: false,
       message: "Some error occured!",
     });
@@ -99,7 +130,15 @@ const capturePayment = async (req, res) => {
   try {
     const { paymentId, payerId, orderId } = req.body;
 
-    let order = await Order.findById(orderId);
+    // ✅ Prevent CastError noise for invalid orderId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(404).json({
+        success: false,
+        message: "Order can not be found",
+      });
+    }
+
+    const order = await Order.findById(orderId);
 
     if (!order) {
       return res.status(404).json({
@@ -114,9 +153,18 @@ const capturePayment = async (req, res) => {
     order.payerId = payerId;
 
     for (let item of order.cartItems) {
-      let product = await Product.findById(item.productId);
+      const product = await Product.findById(item.productId);
 
+      // ✅ Fix: original message tried to use product.title when product is null
       if (!product) {
+        return res.status(404).json({
+          success: false,
+          message: `Product not found for id ${item.productId}`,
+        });
+      }
+
+      // ✅ Minimal safety: prevent negative stock (keep same flow)
+      if (product.totalStock < item.quantity) {
         return res.status(404).json({
           success: false,
           message: `Not enough stock for this product ${product.title}`,
@@ -124,23 +172,24 @@ const capturePayment = async (req, res) => {
       }
 
       product.totalStock -= item.quantity;
-
       await product.save();
     }
 
     const getCartId = order.cartId;
-    await Cart.findByIdAndDelete(getCartId);
+    if (getCartId && mongoose.Types.ObjectId.isValid(getCartId)) {
+      await Cart.findByIdAndDelete(getCartId);
+    }
 
     await order.save();
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Order confirmed",
       data: order,
     });
   } catch (e) {
-    console.log(e);
-    res.status(500).json({
+    console.error(e);
+    return res.status(500).json({
       success: false,
       message: "Some error occured!",
     });
@@ -151,7 +200,7 @@ const getAllOrdersByUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const orders = await Order.find({ userId });
+    const orders = await Order.find({ userId }).lean();
 
     if (!orders.length) {
       return res.status(404).json({
@@ -160,13 +209,13 @@ const getAllOrdersByUser = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: orders,
     });
   } catch (e) {
-    console.log(e);
-    res.status(500).json({
+    console.error(e);
+    return res.status(500).json({
       success: false,
       message: "Some error occured!",
     });
@@ -177,7 +226,15 @@ const getOrderDetails = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const order = await Order.findById(id);
+    // ✅ Prevent CastError noise for invalid id
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found!",
+      });
+    }
+
+    const order = await Order.findById(id).lean();
 
     if (!order) {
       return res.status(404).json({
@@ -186,13 +243,13 @@ const getOrderDetails = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: order,
     });
   } catch (e) {
-    console.log(e);
-    res.status(500).json({
+    console.error(e);
+    return res.status(500).json({
       success: false,
       message: "Some error occured!",
     });

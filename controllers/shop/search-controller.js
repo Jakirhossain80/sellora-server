@@ -3,14 +3,26 @@ const Product = require("../../models/Product");
 const searchProducts = async (req, res) => {
   try {
     const { keyword } = req.params;
+
+    // ✅ Fix typo: "succes" -> "success" (safe + no behavior change intended)
     if (!keyword || typeof keyword !== "string") {
       return res.status(400).json({
-        succes: false,
+        success: false,
         message: "Keyword is required and must be in string format",
       });
     }
 
-    const regEx = new RegExp(keyword, "i");
+    // ✅ Minimal safety: trim + avoid regex injection / invalid patterns
+    const safeKeyword = keyword.trim();
+    if (!safeKeyword) {
+      return res.status(400).json({
+        success: false,
+        message: "Keyword is required and must be in string format",
+      });
+    }
+
+    const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regEx = new RegExp(escapeRegex(safeKeyword), "i");
 
     const createSearchQuery = {
       $or: [
@@ -21,15 +33,16 @@ const searchProducts = async (req, res) => {
       ],
     };
 
-    const searchResults = await Product.find(createSearchQuery);
+    // ✅ lean() for faster reads (safe for read-only)
+    const searchResults = await Product.find(createSearchQuery).lean();
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: searchResults,
     });
   } catch (error) {
-    console.log(error);
-    res.status(500).json({
+    console.error(error);
+    return res.status(500).json({
       success: false,
       message: "Error",
     });
