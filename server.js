@@ -81,13 +81,9 @@ if (!process.env.MONGO_URI) {
   process.exit(1);
 }
 
-// ✅ Minimal + safe: add common mongoose connection options and slightly better logs
+// ✅ Merged: removed unsupported keepAlive option, kept improved logging + exit on failure
 mongoose
-  .connect(process.env.MONGO_URI, {
-    // These are safe defaults (ignored by newer drivers if not needed)
-    // keepAlive helps long-running deployments
-    keepAlive: true,
-  })
+  .connect(process.env.MONGO_URI)
   .then(() => {
     console.log("✅ MongoDB connected");
     app.listen(PORT, () =>

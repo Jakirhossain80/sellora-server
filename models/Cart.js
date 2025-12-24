@@ -6,7 +6,7 @@ const CartSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true, // ✅ minimal + safe: speeds up Cart.findOne({ userId })
+      // ❌ removed index: true (duplicate with schema.index below)
     },
     items: [
       {
@@ -28,7 +28,7 @@ const CartSchema = new mongoose.Schema(
   }
 );
 
-// ✅ minimal + safe: ensure one cart per user (prevents duplicates, improves reliability)
+// ✅ keep one cart per user
 CartSchema.index({ userId: 1 }, { unique: true });
 
 module.exports = mongoose.model("Cart", CartSchema);
