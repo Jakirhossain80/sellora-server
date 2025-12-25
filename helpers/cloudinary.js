@@ -22,7 +22,7 @@ if (
 
 const storage = multer.memoryStorage();
 
-// ✅ Minimal safety: small guard + clearer error in case upload fails
+//small guard + clearer error in case upload fails
 async function imageUploadUtil(file) {
   if (!file) {
     throw new Error("No file provided for Cloudinary upload");
