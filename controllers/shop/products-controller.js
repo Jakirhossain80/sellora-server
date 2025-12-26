@@ -3,7 +3,19 @@ const Product = require("../../models/Product");
 
 const getFilteredProducts = async (req, res) => {
   try {
-    const { category = "", brand = "", sortBy = "price-lowtohigh" } = req.query;
+    const {
+      category = "",
+      brand = "",
+      sortBy = "price-lowtohigh",
+      page = "1",
+      limit = "8",
+    } = req.query;
+
+    // ✅ Pagination
+    const currentPage = Math.max(parseInt(page, 10) || 1, 1);
+    const parsedLimit = Math.max(parseInt(limit, 10) || 8, 1);
+    const safeLimit = Math.min(parsedLimit, 50);
+    const skip = (currentPage - 1) * safeLimit;
 
     let filters = {};
 
@@ -40,15 +52,27 @@ const getFilteredProducts = async (req, res) => {
         break;
     }
 
-    // ✅ lean() improves performance for read-only responses
-    const products = await Product.find(filters).sort(sort).lean();
+    // ✅ Apply pagination + total count (same business logic)
+    const [products, totalItems] = await Promise.all([
+      Product.find(filters).sort(sort).skip(skip).limit(safeLimit).lean(),
+      Product.countDocuments(filters),
+    ]);
+
+    const totalPages = Math.ceil(totalItems / safeLimit);
 
     return res.status(200).json({
       success: true,
       data: products,
+      pagination: {
+        totalItems,
+        totalPages,
+        currentPage,
+        limit: safeLimit,
+        hasNextPage: currentPage < totalPages,
+        hasPrevPage: currentPage > 1,
+      },
     });
   } catch (e) {
-    // ✅ Fix: was logging an undefined variable "error"
     console.error(e);
     return res.status(500).json({
       success: false,
@@ -84,7 +108,6 @@ const getProductDetails = async (req, res) => {
       data: product,
     });
   } catch (e) {
-    // ✅ Fix: was logging an undefined variable "error"
     console.error(e);
     return res.status(500).json({
       success: false,

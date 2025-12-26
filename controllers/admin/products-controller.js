@@ -71,14 +71,37 @@ const addProduct = async (req, res) => {
   }
 };
 
-//fetch all products
+//fetch all products (paginated)
 const fetchAllProducts = async (req, res) => {
   try {
-    // ✅ lean() for faster read + less memory (safe for read-only)
-    const listOfProducts = await Product.find({}).lean();
+    // ✅ Pagination via query params (defaults: page=1, limit=8)
+    const page = Math.max(parseInt(req.query.page || "1", 10), 1);
+    const limit = Math.max(parseInt(req.query.limit || "8", 10), 1);
+
+    // ✅ optional safety cap to prevent huge payloads
+    const safeLimit = Math.min(limit, 50);
+
+    const skip = (page - 1) * safeLimit;
+
+    // ✅ Fetch paginated data + total count (no business logic changed)
+    const [listOfProducts, totalItems] = await Promise.all([
+      Product.find({}).skip(skip).limit(safeLimit).lean(),
+      Product.countDocuments({}),
+    ]);
+
+    const totalPages = Math.ceil(totalItems / safeLimit);
+
     return res.status(200).json({
       success: true,
       data: listOfProducts,
+      pagination: {
+        totalItems,
+        totalPages,
+        currentPage: page,
+        limit: safeLimit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
     });
   } catch (e) {
     console.error(e);
