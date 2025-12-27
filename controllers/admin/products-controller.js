@@ -4,7 +4,6 @@ const Product = require("../../models/Product");
 
 const handleImageUpload = async (req, res) => {
   try {
-    // ✅ Minimal guard to avoid crashing when no file is sent
     if (!req.file?.buffer) {
       return res.status(400).json({
         success: false,
@@ -29,7 +28,7 @@ const handleImageUpload = async (req, res) => {
   }
 };
 
-//add a new product
+// add a new product
 const addProduct = async (req, res) => {
   try {
     const {
@@ -44,7 +43,6 @@ const addProduct = async (req, res) => {
       averageReview,
     } = req.body;
 
-    // ⚠️ Keeping your existing behavior; just removing noisy console log
     const newlyCreatedProduct = new Product({
       image,
       title,
@@ -71,19 +69,18 @@ const addProduct = async (req, res) => {
   }
 };
 
-//fetch all products (paginated)
+// ✅ fetch all products (PAGINATED)
 const fetchAllProducts = async (req, res) => {
   try {
     // ✅ Pagination via query params (defaults: page=1, limit=8)
     const page = Math.max(parseInt(req.query.page || "1", 10), 1);
     const limit = Math.max(parseInt(req.query.limit || "8", 10), 1);
 
-    // ✅ optional safety cap to prevent huge payloads
+    // (optional safety cap)
     const safeLimit = Math.min(limit, 50);
-
     const skip = (page - 1) * safeLimit;
 
-    // ✅ Fetch paginated data + total count (no business logic changed)
+    // ✅ Fetch paginated list + total count
     const [listOfProducts, totalItems] = await Promise.all([
       Product.find({}).skip(skip).limit(safeLimit).lean(),
       Product.countDocuments({}),
@@ -112,7 +109,7 @@ const fetchAllProducts = async (req, res) => {
   }
 };
 
-//edit a product
+// edit a product
 const editProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -128,7 +125,6 @@ const editProduct = async (req, res) => {
       averageReview,
     } = req.body;
 
-    // ✅ Prevent CastError for invalid ObjectId (minimal + safe)
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(404).json({
         success: false,
@@ -169,12 +165,11 @@ const editProduct = async (req, res) => {
   }
 };
 
-//delete a product
+// delete a product
 const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // ✅ Prevent CastError for invalid ObjectId (minimal + safe)
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(404).json({
         success: false,
