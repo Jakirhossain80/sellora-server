@@ -5,11 +5,11 @@ const {
   fetchCartItems,
   deleteCartItem,
   updateCartItemQty,
+  clearCart,
 } = require("../../controllers/shop/cart-controller");
 
 const router = express.Router();
 
-// ✅ Minimal + safe: wrap async handlers to avoid unhandled promise rejections
 const asyncHandler =
   (fn) =>
   (req, res, next) =>
@@ -18,6 +18,10 @@ const asyncHandler =
 router.post("/add", asyncHandler(addToCart));
 router.get("/get/:userId", asyncHandler(fetchCartItems));
 router.put("/update-cart", asyncHandler(updateCartItemQty));
+
+// ✅ IMPORTANT: place this BEFORE "/:userId/:productId"
+router.delete("/clear/:userId", asyncHandler(clearCart));
+
 router.delete("/:userId/:productId", asyncHandler(deleteCartItem));
 
 module.exports = router;
