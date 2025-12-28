@@ -17,6 +17,13 @@ const shopReviewRouter = require("./routes/shop/review-routes");
 
 const commonFeatureRouter = require("./routes/common/feature-routes");
 
+const stripeShopRoutes = require("./routes/shop/stripe-routes");
+const stripeWebhookRoutes = require("./routes/shop/stripe-webhook-routes");
+
+
+
+
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -39,6 +46,9 @@ app.use(
   })
 );
 
+
+app.use("/api/shop/stripe", stripeWebhookRoutes);
+
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -60,6 +70,8 @@ app.use("/api/shop/search", shopSearchRouter);
 app.use("/api/shop/review", shopReviewRouter);
 
 app.use("/api/common/feature", commonFeatureRouter);
+app.use("/api/shop/stripe", stripeShopRoutes);
+
 
 // 404 handler
 app.use((req, res) => {
