@@ -8,7 +8,7 @@ const {
 
 const router = express.Router();
 
-// ✅ Minimal + safe: wrap async handlers to avoid unhandled promise rejections
+
 const asyncHandler =
   (fn) =>
   (req, res, next) =>
